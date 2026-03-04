@@ -1,25 +1,27 @@
-from tqdm.auto import tqdm
 import re
-from utils import extract_quotes_from_markdown
 
 import dspy
+from tqdm.auto import tqdm
+
+from utils import extract_quotes_from_markdown
+
 
 class ConversationalAgentStep(dspy.Signature):
     """
-    You are a congressional representative for your source document at the Swarm Intelligence Congress of Documents. 
-    This congressional session is one of many parallel groups operating simultaneously as part of a broader collective 
-    intelligence system. You are debating with OTHER REPRESENTATIVES in your specific group about what the author(s) 
-    of your documents would advise for THE SPECIFIC QUERY SITUATION. Your deliberations will contribute to the emergent 
+    You are a congressional representative for your source document at the Swarm Intelligence Congress of Documents.
+    This congressional session is one of many parallel groups operating simultaneously as part of a broader collective
+    intelligence system. You are debating with OTHER REPRESENTATIVES in your specific group about what the author(s)
+    of your documents would advise for THE SPECIFIC QUERY SITUATION. Your deliberations will contribute to the emergent
     wisdom of the entire document swarm.
-    
+
     INTELLIGENCE BRIEFINGS FROM THE BROADER SWARM:
-    Periodically during your debate, an Intelligence Reporter will share insights from other congressional sessions 
+    Periodically during your debate, an Intelligence Reporter will share insights from other congressional sessions
     across the document swarm. These briefings appear as:
-    
+
     --- INTELLIGENCE BRIEFING FROM Intelligence Reporter ---
     [Insights from other parallel sessions debating the same query]
     --- END INTELLIGENCE BRIEFING ---
-    
+
     When you receive these briefings:
     - Consider how the external insights relate to your document's perspective
     - Use them to strengthen your arguments or challenge other representatives
@@ -38,7 +40,7 @@ class ConversationalAgentStep(dspy.Signature):
     ✓ "Based on my document, the author(s) would tell this person to..."
     ✓ "I disagree with Representative 1's approach to this case because my document shows..."
     ✓ "For this specific situation, the author(s) would prioritize..."
-    
+
     ✗ "My document talks about [specific person]..." (unless that example directly applies to query)
     ✗ "The author(s) helped someone else with..." (unless that example applies to query)
     ✗ "In my document, there's a case where..." (unless it's relevant to the query)
@@ -124,7 +126,7 @@ class ConversationalAgentStep(dspy.Signature):
 
     WHEN TO YIELD VS. WHEN TO FIGHT:
     YIELD when: Your document truly has nothing relevant to add
-    FIGHT when: 
+    FIGHT when:
     - Someone misrepresents your document's domain
     - The group is reaching conclusions your document contradicts
     - Important nuances from your document are being overlooked
@@ -165,7 +167,7 @@ class ConversationalAgentStep(dspy.Signature):
     - Check conversation transcript
     - If only welcome message before you = you're FIRST, make opening argument
     - If other representatives spoke = you're RESPONDING, engage with their actual points
-    
+
     BEFORE RESPONDING: Look at the conversation transcript. If you see only the welcome message and no other representatives have spoken, you are OPENING the debate, not responding to anyone. You cannot disagree with anything because nothing has been said yet!
 
     STARTING VS. RESPONDING TO DEBATE:
@@ -183,11 +185,11 @@ class ConversationalAgentStep(dspy.Signature):
 
     FIRST SPEAKER (no prior representatives):
     ✓ "Based on my document, the author(s) would approach this situation by..."
-    ✓ "My document clearly shows the author(s)' approach would be..."  
+    ✓ "My document clearly shows the author(s)' approach would be..."
     ✓ "According to my document, the key issue here is..."
 
     ✗ "While others might suggest..." (there are no others yet!)
-    ✗ "Many here will likely..." (you're starting the discussion!)  
+    ✗ "Many here will likely..." (you're starting the discussion!)
     ✗ "I disagree with the assumption..." (no one has made assumptions yet!)
 
     RESPONDING SPEAKER (others have spoken):
@@ -197,17 +199,17 @@ class ConversationalAgentStep(dspy.Signature):
     ✓ "Representative 1 missed the key point that my document shows..."
     ✓ "Building on what Representative 3 said, but my document adds..."
     """
-    
+
     source_document: str = dspy.InputField()
     query: str = dspy.InputField()
     conversation_transcript: str = dspy.InputField()
-    
+
     relative_relevance: str = dspy.OutputField(
         desc="Assess if your document has something important to contribute, correct, or challenge in the current discussion. High relevance includes when you need to defend your domain or dispute emerging consensus."
     )
-    
+
     next_turn: str = dspy.OutputField(
-        desc="Engage authentically based on your document's perspective. Agree genuinely or disagree firmly. Challenge misconceptions. Defend your position. Build only when you actually agree. Support strong claims with **\"exact quotes\"** (MOST IMPORTANT: Please stick to **\"{quote}\"** quote format, NEVER use <v_quote> or <u_quote> in your next turn, this will be done automatically in a post-processing step). Be direct about what you think is wrong or incomplete."
+        desc='Engage authentically based on your document\'s perspective. Agree genuinely or disagree firmly. Challenge misconceptions. Defend your position. Build only when you actually agree. Support strong claims with **"exact quotes"** (MOST IMPORTANT: Please stick to **"{quote}"** quote format, NEVER use <v_quote> or <u_quote> in your next turn, this will be done automatically in a post-processing step). Be direct about what you think is wrong or incomplete.'
     )
 
 
@@ -216,44 +218,44 @@ class ConversationalAgent(dspy.Module):
     A DSPy module that implements a congressional representative for documents
     in a Swarm Intelligence Congress setting.
     """
-    
+
     def __init__(self):
         super().__init__()
         self.generate_response = dspy.ChainOfThought(ConversationalAgentStep)
-    
+
     def forward(self, query: str, conversation_transcript: str, source_document: str):
         """
         Generate the next turn in the congressional conversation.
-        
+
         Args:
             query: The question the congress is trying to answer
             conversation_transcript: The complete conversation history
             source_document: The document this agent represents
-            
+
         Returns:
             The agent's next contribution to the conversation
         """
         result = self.generate_response(
             query=query,
             conversation_transcript=conversation_transcript,
-            source_document=source_document
+            source_document=source_document,
         )
-        
+
         return dspy.Prediction(
             next_turn=result.next_turn,
             relative_relevance=result.relative_relevance,
-            reasoning=result.reasoning if hasattr(result, 'reasoning') else None
+            reasoning=result.reasoning if hasattr(result, "reasoning") else None,
         )
-    
+
     async def aforward(self, query: str, conversation_transcript: str, source_document: str):
         """
         Async version of forward method for generating the next turn in the congressional conversation.
-        
+
         Args:
             query: The question the congress is trying to answer
             conversation_transcript: The complete conversation history
             source_document: The document this agent represents
-            
+
         Returns:
             The agent's next contribution to the conversation
         """
@@ -261,11 +263,11 @@ class ConversationalAgent(dspy.Module):
         result = await self.generate_response.acall(
             query=query,
             conversation_transcript=conversation_transcript,
-            source_document=source_document
+            source_document=source_document,
         )
-        
+
         return dspy.Prediction(
             next_turn=result.next_turn,
             relative_relevance=result.relative_relevance,
-            reasoning=result.reasoning if hasattr(result, 'reasoning') else None
+            reasoning=result.reasoning if hasattr(result, "reasoning") else None,
         )

@@ -1,11 +1,13 @@
-import os
-import sqlite3
+import asyncio
+import functools
 import hashlib
 import json
-import functools
-import asyncio
-import dspy
+import os
+import sqlite3
 from typing import Any, Callable
+
+import dspy
+
 
 class DurableCache:
     def __init__(self, db_path: str = "swarm_state.db"):
@@ -28,20 +30,20 @@ class DurableCache:
     def _generate_key(self, component: Any, kwargs: dict) -> str:
         # Get current LM settings from DSPy
         lm = dspy.settings.lm
-        
+
         # Capture the model and its specific parameters (temperature, max_tokens, etc.)
         model_info = {
-            "model": getattr(lm, 'model', 'unknown'),
-            "lm_kwargs": getattr(lm, 'kwargs', {})
+            "model": getattr(lm, "model", "unknown"),
+            "lm_kwargs": getattr(lm, "kwargs", {}),
         }
 
         # Create a stable representation of the intent including the model state
         intent = {
             "model_info": model_info,
             "component": component.__class__.__name__,
-            "kwargs": kwargs
+            "kwargs": kwargs,
         }
-        
+
         # Sort keys to ensure stable hashing
         intent_str = json.dumps(intent, sort_keys=True, default=str)
         return hashlib.sha256(intent_str.encode()).hexdigest(), intent_str
@@ -58,7 +60,7 @@ class DurableCache:
 
     def set(self, component: Any, kwargs: dict, result: dspy.Prediction):
         key_hash, intent_str = self._generate_key(component, kwargs)
-        
+
         # Serialize the dspy.Prediction
         if hasattr(result, "toDict"):
             result_data = result.toDict()
@@ -66,31 +68,34 @@ class DurableCache:
             result_data = dict(result)
 
         result_json = json.dumps(result_data, default=str)
-        
+
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO call_cache (key_hash, component_name, intent_json, result_json) VALUES (?, ?, ?, ?)",
-                (key_hash, component.__class__.__name__, intent_str, result_json)
+                (key_hash, component.__class__.__name__, intent_str, result_json),
             )
 
+
 cache = DurableCache()
+
 
 def durable_memo(func):
     @functools.wraps(func)
     async def wrapper(component, *args, **kwargs):
         from config import VERBOSE, console
+
         # Check cache first
         cached_result = cache.get(component, kwargs)
         if cached_result is not None:
             if VERBOSE:
                 component_name = component.__class__.__name__
-                if hasattr(component, 'signature'):
+                if hasattr(component, "signature"):
                     component_name = f"{component_name}({component.signature.__name__})"
                 console.print(f"[bold cyan]⚡ Cache Hit:[/] [cyan]{component_name}[/]")
             return cached_result
         else:
             key_hash, _ = cache._generate_key(component, kwargs)
-            
+
             # Save the miss to disk for debugging
             # os.makedirs("cache_misses_kwargs", exist_ok=True)
             # with open(os.path.join("cache_misses_kwargs", f"{key_hash}.json"), "w") as f:
@@ -98,14 +103,15 @@ def durable_memo(func):
 
             if VERBOSE:
                 component_name = component.__class__.__name__
-                if hasattr(component, 'signature'):
+                if hasattr(component, "signature"):
                     component_name = f"{component_name}({component.signature.__name__})"
                 console.print(f"[bold red]❌ Cache Miss:[/] [cyan]{component_name}[/] [dim]({key_hash})[/]")
-        
+
         # Execute original function
         result = await func(component, *args, **kwargs)
-        
+
         # Persist result
         cache.set(component, kwargs, result)
         return result
+
     return wrapper

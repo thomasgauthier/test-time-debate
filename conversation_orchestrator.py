@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from langfuse import observe, get_client
+from langfuse import get_client, observe
 
 langfuse = get_client()
 
@@ -19,21 +19,23 @@ from openinference.instrumentation.litellm import LiteLLMInstrumentor
 DSPyInstrumentor().instrument()
 LiteLLMInstrumentor().instrument()
 
-import dspy
-import random
-import json
-import sqlite3
 import asyncio
 import hashlib
+import json
 import os
-from typing import List, Optional, Callable, Any
+import random
+import sqlite3
+from typing import Any, Callable, List, Optional
+
+import dspy
 from tqdm.asyncio import tqdm
-from utils import verify_and_wrap_quotes, format_congress_result, _retry_acall
-from conversational_agent import ConversationalAgent
-from swarm_intelligence_reducer import SwarmIntelligenceReducer
-from insight_reporter import InsightReporter
+
 from collective_intelligence_synthetizer import CollectiveIntelligenceSynthetizer
 from config import console
+from conversational_agent import ConversationalAgent
+from insight_reporter import InsightReporter
+from swarm_intelligence_reducer import SwarmIntelligenceReducer
+from utils import _retry_acall, format_congress_result, verify_and_wrap_quotes
 
 lm_kwargs = {
     "api_key": "hello",
@@ -50,9 +52,7 @@ dspy.configure(lm=lm)
 class ConversationTranscript:
     """Stateful conversation transcript manager for the Swarm Intelligence Congress."""
 
-    def __init__(
-        self, query: str, documents: List[dict] = None, congress_id: int = None
-    ):
+    def __init__(self, query: str, documents: List[dict] = None, congress_id: int = None):
         self.query = query
         self.documents = documents or []
         self.congress_id = congress_id
@@ -86,15 +86,10 @@ class ConversationTranscript:
         # Add document information
         if self.documents:
             transcript += f"\nDocuments in this session: {len(self.documents)}"
-            document_titles = [
-                doc.get("title", f"Document {doc.get('id', 'Unknown')}")
-                for doc in self.documents
-            ]
+            document_titles = [doc.get("title", f"Document {doc.get('id', 'Unknown')}") for doc in self.documents]
             transcript += f"\nDocument Titles: {', '.join(document_titles)}"
 
-        transcript += (
-            f"\n\nCongress is debating the following question: {self.query}\n\n"
-        )
+        transcript += f"\n\nCongress is debating the following question: {self.query}\n\n"
 
         for turn in self.turns:
             speaker = turn["speaker"]
@@ -106,9 +101,7 @@ class ConversationTranscript:
                 transcript += f"{speaker}: {turn['content']}\n"
 
         if self.is_empty():
-            transcript += (
-                "\n\n [CONVERSATION EMPTY, YOU ARE THE FIRST REPRESENTATIVE TO SPEAK]"
-            )
+            transcript += "\n\n [CONVERSATION EMPTY, YOU ARE THE FIRST REPRESENTATIVE TO SPEAK]"
 
         return transcript
 
@@ -254,9 +247,7 @@ async def run_congress(
             )
 
         # Verify quotes and wrap them
-        verified_response = verify_and_wrap_quotes(
-            doc_response.next_turn, doc["content"]
-        )
+        verified_response = verify_and_wrap_quotes(doc_response.next_turn, doc["content"])
 
         # Add turn to conversation
         representative_name = f"Representative {i + 1} ({doc['title']})"
@@ -278,9 +269,7 @@ async def run_congress(
     return results, conversation
 
 
-async def run_multiple_congresses(
-    query: str, group_size: int = 5, max_concurrent: int = 1
-):
+async def run_multiple_congresses(query: str, group_size: int = 5, max_concurrent: int = 1):
     """
     Run multiple congresses simultaneously with documents from the database.
 
@@ -299,9 +288,7 @@ async def run_multiple_congresses(
         all_documents = json.load(file)
 
     # Split documents into groups
-    document_groups = split_documents_into_groups(
-        all_documents, group_size, randomize=True
-    )
+    document_groups = split_documents_into_groups(all_documents, group_size, randomize=True)
 
     # Create semaphore to control concurrent operations
     semaphore = asyncio.Semaphore(max_concurrent)
@@ -347,9 +334,7 @@ def ensure_directory_exists(directory: str) -> None:
         os.makedirs(directory)
 
 
-def save_congress_results(
-    results: List[dict], query: str, output_file: str = "congress_results.txt"
-):
+def save_congress_results(results: List[dict], query: str, output_file: str = "congress_results.txt"):
     """
     Save congress results to a text file in a query-specific directory.
 
@@ -377,9 +362,7 @@ def save_congress_results(
     print(f"📄 Results saved to: {full_path}")
 
 
-async def main():
-    question = "I'm trying to quit weed after years of a daily smoking habit. It's now 8PM, I'm home and I'm bored and this is exactly the kind of situation where I'd roll a joint and get high but now I decided I won't but I just feel the urge so bad. I can't think about anytyhing else. What am I gonna do? I can't live like this for the rest of my days."
-
+async def run_swarm_intelligence_congress(question: str):
     query = f"""What would the author(s) of your documents say about this: <current_question>{question}</current_question>?"""
 
     console.print(f"\n[bold magenta]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/]")
@@ -388,9 +371,7 @@ async def main():
 
     # Run multiple congresses and get results, conversations, and document groups
     console.print(f"[bold blue]🏛️  STAGE 1: Parallel Congresses (Initial Debate)[/]")
-    results, conversations, document_groups = await run_multiple_congresses(
-        query, group_size=5
-    )
+    results, conversations, document_groups = await run_multiple_congresses(query, group_size=5)
 
     # Create query-specific directory and save the original question
     query_dir = get_query_directory(query)
@@ -423,9 +404,7 @@ async def main():
                 external_insights=insights_results.final_insights,
             )
 
-    tasks = [
-        asyncio.create_task(bounded_report(transcript)) for transcript in transcripts
-    ]
+    tasks = [asyncio.create_task(bounded_report(transcript)) for transcript in transcripts]
     console.print(f"🔄 Generating {len(tasks)} parallel reports...")
     reports = await tqdm.gather(*tasks)
 
@@ -435,7 +414,7 @@ async def main():
         if report.intelligence_briefing != "NO BRIEFING NEEDED":
             conversation.add_turn("Intelligence Reporter", report.intelligence_briefing)
             briefing_count += 1
-    
+
     console.print(f"🎯 Diffusion: {briefing_count}/{len(reports)} congresses received briefings")
 
     # Run second round of debates with intelligence briefings
@@ -447,10 +426,7 @@ async def main():
     async def run_second_round_for_congress(conversation, documents):
         async with sem_second_round:
             # Only run second round if intelligence briefing was added
-            has_intelligence = any(
-                "Intelligence Reporter" in turn["speaker"]
-                for turn in conversation.turns
-            )
+            has_intelligence = any("Intelligence Reporter" in turn["speaker"] for turn in conversation.turns)
             if not has_intelligence:
                 return conversation
 
@@ -466,9 +442,7 @@ async def main():
                 )
 
                 # Verify quotes and wrap them
-                verified_response = verify_and_wrap_quotes(
-                    doc_response.next_turn, doc["content"]
-                )
+                verified_response = verify_and_wrap_quotes(doc_response.next_turn, doc["content"])
 
                 # Add turn to conversation
                 representative_name = f"Representative {i + 1} ({doc['title']})"
@@ -516,15 +490,11 @@ async def main():
     console.print(f"\n[bold blue]🧠 STAGE 5: Collective Intelligence Synthesis[/]")
 
     # Get all final transcripts
-    final_transcripts = [
-        conversation.to_prompt_fragment() for conversation in enhanced_conversations
-    ]
+    final_transcripts = [conversation.to_prompt_fragment() for conversation in enhanced_conversations]
 
     # Create synthesizer and generate final answer
     synthesizer = CollectiveIntelligenceSynthetizer(chunk_size=12)
-    final_synthesis = await _retry_acall(
-        synthesizer, original_query=query, congress_transcripts=final_transcripts
-    )
+    final_synthesis = await _retry_acall(synthesizer, original_query=query, congress_transcripts=final_transcripts)
 
     # Save final synthesis
     final_answer_path = os.path.join(query_dir, "final_collective_answer.txt")
@@ -536,18 +506,10 @@ async def main():
         f.write("COLLECTIVE ANSWER FROM DOCUMENT SWARM:\n")
         f.write(final_synthesis.collective_answer)
         f.write(f"\n\n" + "=" * 50 + "\n")
-        f.write(
-            f"Processed {final_synthesis.total_chunks_processed} transcript chunks\n"
-        )
-        f.write(
-            f"Synthesized from {len(enhanced_conversations)} congressional sessions\n"
-        )
+        f.write(f"Processed {final_synthesis.total_chunks_processed} transcript chunks\n")
+        f.write(f"Synthesized from {len(enhanced_conversations)} congressional sessions\n")
 
     console.print(f"\n[bold magenta]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/]")
     console.print(f"[bold magenta]🎯 FINAL SYNTHESIS COMPLETED![/]")
     console.print(f"[bold magenta]📄 Answer saved to: {final_answer_path}[/]")
     console.print(f"[bold magenta]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/]\n")
-
-
-if __name__ == "__main__":
-    asyncio.run(main())

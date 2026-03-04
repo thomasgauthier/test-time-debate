@@ -1,6 +1,9 @@
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
 import dspy
+
 from utils import _retry_acall
+
 
 class InsightReport(dspy.Signature):
     """
@@ -19,7 +22,7 @@ class InsightReport(dspy.Signature):
     RELEVANCE ASSESSMENT FOR YOUR SESSION:
     Report insights that could:
     ✓ Provide new approaches your representatives haven't considered
-    ✓ Give representatives stronger documentary evidence for their positions  
+    ✓ Give representatives stronger documentary evidence for their positions
     ✓ Challenge weak or unchallenged assumptions in your current debate
     ✓ Break deadlocks by introducing tested alternative perspectives
     ✓ Fill knowledge gaps where representatives seem uncertain
@@ -74,15 +77,19 @@ class InsightReport(dspy.Signature):
     - Quality and verifiability of the external insights
     - Strategic value for advancing your session's congressional debate
     """
-    
-    external_insights: List[str] = dspy.InputField(desc="List of insights extracted from other congressional sessions across the swarm intelligence system")
-    
-    local_transcript: str = dspy.InputField(desc="Current transcript of this congressional session, including query and all representative exchanges so far")
-    
+
+    external_insights: List[str] = dspy.InputField(
+        desc="List of insights extracted from other congressional sessions across the swarm intelligence system"
+    )
+
+    local_transcript: str = dspy.InputField(
+        desc="Current transcript of this congressional session, including query and all representative exchanges so far"
+    )
+
     relevance_assessment: str = dspy.OutputField(
         desc="Analysis of which external insights are relevant to this session's debate, considering query alignment, representative needs, and timing factors"
     )
-    
+
     intelligence_briefing: str = dspy.OutputField(
         desc="Formatted intelligence briefing for representatives, or 'NO BRIEFING NEEDED' if no external insights are sufficiently relevant or timely"
     )
@@ -99,6 +106,6 @@ class InsightReporter(dspy.Module):
     async def aforward(self, local_transcript: str, external_insights: List[str]) -> dspy.Prediction:
         return await _retry_acall(
             self.insight_reporter,
-            local_transcript=local_transcript, 
-            external_insights=external_insights
+            local_transcript=local_transcript,
+            external_insights=external_insights,
         )
